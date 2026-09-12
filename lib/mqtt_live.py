@@ -73,3 +73,14 @@ def live() -> dict:
         snap = dict(_state)
     snap["age_s"] = time.time() - snap["rx_epoch"] if snap["rx_epoch"] else None
     return snap
+
+
+def publish_cmd(cmd: str) -> bool:
+    """Publish an "ON"/"OFF" breaker command. Returns True once it's queued
+    for delivery (not proof the device received or executed it — watch the
+    live status a couple seconds later for that)."""
+    client = _client()
+    if not client.is_connected():
+        return False
+    info = client.publish(MQTT["cmd_topic"], cmd, qos=1, retain=False)
+    return info.rc == mqtt.MQTT_ERR_SUCCESS
