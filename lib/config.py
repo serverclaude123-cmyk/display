@@ -26,12 +26,13 @@ MQTT = {
     "topic": _get("mqtt", "topic", "powermeter/meter01/state"),
     "tls": str(_get("mqtt", "tls", "true")).lower() == "true",
 }
-
-SUPABASE = {
-    "url": (_get("supabase", "url", "") or "").rstrip("/"),
-    "anon_key": _get("supabase", "anon_key", "") or "",
-}
+# Where breaker ON/OFF commands are published; must match MQTT_CMD_TOPIC in the
+# ESP32 sketch. Defaults to the state topic's sibling "…/cmd".
+MQTT["cmd_topic"] = _get("mqtt", "cmd_topic", "") or (
+    MQTT["topic"].rsplit("/", 1)[0] + "/cmd"
+)
 
 # UI
 LIVE_REFRESH_MS = int(_get("ui", "live_refresh_ms", 2000) or 2000)
 TIMEZONE = _get("ui", "timezone", "Asia/Jakarta")
+DEVICE_URL = (_get("ui", "device_url", "") or "").rstrip("/")  # http://<esp32-ip> for the on-device trends
