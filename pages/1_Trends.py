@@ -10,7 +10,7 @@ st.title("📈 Trends & history")
 
 st.info(
     "History is logged to the meter's **SD card** (every 10 s, 1-year FIFO) and "
-    "served by the ESP32 itself — not stored in the cloud."
+    "served by the Gateway itself — not stored in the cloud."
 )
 
 if DEVICE_URL:
@@ -18,8 +18,8 @@ if DEVICE_URL:
     st.caption(f"`{DEVICE_URL}` — reachable from any device on the same Wi-Fi.")
 else:
     st.write(
-        "Open **`http://<esp32-ip>/`** in a browser on the same Wi-Fi network. "
-        "The ESP32 prints its IP to the serial monitor and shows it on the LCD."
+        "Open **`http://<gateway-ip>/`** in a browser on the same Wi-Fi network. "
+        "The Gateway prints its IP to the serial monitor and shows it on the LCD."
     )
     st.caption("Set `device_url` under `[ui]` in the app secrets to show a button here.")
 
