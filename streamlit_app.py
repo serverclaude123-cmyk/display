@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
-from lib.config import LIVE_REFRESH_MS
+from lib.config import LIVE_REFRESH_MS, MQTT
 from lib.mqtt_live import live, publish_cmd
 from lib.timeutil import epoch_to_tz, fmt_age, now_tz
 
@@ -45,6 +45,11 @@ with right:
     if snap["age_s"] is not None:
         rx = epoch_to_tz(snap["rx_epoch"])
         st.caption(f"last packet {rx:%H:%M:%S} ({fmt_age(snap['age_s'])})")
+
+with st.expander("🔧 MQTT connection debug"):
+    st.json({k: v for k, v in snap.items() if k != "payload"})
+    st.caption("Broker/topic this app is using (from Secrets):")
+    st.code(f"host={MQTT['host']}:{MQTT['port']}  tls={MQTT['tls']}  topic={MQTT['topic']}")
 
 if p is None:
     st.info("Waiting for the first MQTT message…")
