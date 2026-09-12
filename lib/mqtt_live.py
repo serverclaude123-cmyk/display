@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import socket
+import ssl
 import threading
 import time
 
@@ -16,25 +17,51 @@ import streamlit as st
 
 from lib.config import MQTT
 
-# paho's underlying socket.create_connection() call has no timeout of its own,
-# so if the network silently drops packets to the broker (rather than
-# rejecting the connection) it can hang for minutes with zero callback fired —
-# exactly the "connecting… forever, no error" symptom. A process-wide default
-# socket timeout forces that connect attempt to fail fast and visibly instead.
-# This app's only other network use is Streamlit's own async server, which is
-# unaffected (it doesn't rely on the blocking-socket default timeout).
+# A global default socket timeout, as a backstop. (In practice paho seems to
+# override this internally in some environments — see _probe() below, which
+# is the check that actually matters.)
 socket.setdefaulttimeout(10)
 
 _state = {
     "payload": None, "rx_epoch": 0.0, "connected": False, "error": None,
-    "connect_attempts": 0, "last_attempt_epoch": 0.0,
+    "connect_attempts": 0, "last_attempt_epoch": 0.0, "probe_error": "not run yet",
 }
 _lock = threading.Lock()
+
+
+def _probe(host: str, port: int, tls: bool, timeout: float = 8.0) -> str | None:
+    """Raw, self-timed TCP(+TLS) reachability check — independent of paho's
+    own connect-timeout handling, which this environment isn't honoring.
+    Returns None if the broker is reachable, else a short reason string."""
+    try:
+        raw = socket.create_connection((host, port), timeout=timeout)
+    except Exception as exc:  # noqa: BLE001
+        return f"TCP connect to {host}:{port} failed: {exc!r}"
+    try:
+        if tls:
+            raw.settimeout(timeout)
+            ctx = ssl.create_default_context()
+            with ctx.wrap_socket(raw, server_hostname=host):
+                pass
+        return None
+    except Exception as exc:  # noqa: BLE001
+        return f"TLS handshake with {host}:{port} failed: {exc!r}"
+    finally:
+        try:
+            raw.close()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _build_client() -> mqtt.Client:
     with _lock:
         _state["error"] = None  # clear any stale error from a prior cached attempt
+
+    probe_err = _probe(MQTT["host"], MQTT["port"], MQTT["tls"])
+    with _lock:
+        _state["probe_error"] = probe_err
+        if probe_err:
+            _state["error"] = probe_err
 
     client = mqtt.Client(
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
