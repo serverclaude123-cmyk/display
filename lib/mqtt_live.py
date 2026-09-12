@@ -83,7 +83,10 @@ def _build_client() -> mqtt.Client:
         client.tls_set()  # uses the system/certifi CA bundle
 
     def on_connect(c, _u, _flags, reason_code, _props=None):
-        ok = int(reason_code) == 0
+        # reason_code is a paho ReasonCode object in the VERSION2 callback API,
+        # not a plain int — int(reason_code) raises. It does support direct
+        # equality/truthiness against int, which is all we need.
+        ok = (reason_code == 0)
         with _lock:
             _state["connected"] = ok
             _state["error"] = None if ok else f"broker refused: {reason_code}"
