@@ -7,6 +7,7 @@ every 2 s auto-refresh — no network call in the render path.
 from __future__ import annotations
 
 import json
+import socket
 import threading
 import time
 
@@ -14,6 +15,15 @@ import paho.mqtt.client as mqtt
 import streamlit as st
 
 from lib.config import MQTT
+
+# paho's underlying socket.create_connection() call has no timeout of its own,
+# so if the network silently drops packets to the broker (rather than
+# rejecting the connection) it can hang for minutes with zero callback fired —
+# exactly the "connecting… forever, no error" symptom. A process-wide default
+# socket timeout forces that connect attempt to fail fast and visibly instead.
+# This app's only other network use is Streamlit's own async server, which is
+# unaffected (it doesn't rely on the blocking-socket default timeout).
+socket.setdefaulttimeout(10)
 
 _state = {
     "payload": None, "rx_epoch": 0.0, "connected": False, "error": None,
