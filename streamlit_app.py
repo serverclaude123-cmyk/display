@@ -5,7 +5,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 from lib.config import LIVE_REFRESH_MS, MQTT
-from lib.mqtt_live import live, publish_cmd
+from lib.mqtt_live import get_log, live, publish_cmd
 from lib.timeutil import epoch_to_tz, fmt_age, now_tz
 
 st.set_page_config(page_title="Power Meter — Live", page_icon="⚡", layout="wide")
@@ -50,6 +50,9 @@ with st.expander("🔧 MQTT connection debug"):
     st.json({k: v for k, v in snap.items() if k != "payload"})
     st.caption("Broker/topic this app is using (from Secrets):")
     st.code(f"host={MQTT['host']}:{MQTT['port']}  tls={MQTT['tls']}  topic={MQTT['topic']}")
+    st.caption("paho's internal log (does it even send CONNECT / hear anything back?):")
+    log = get_log()
+    st.code("\n".join(log) if log else "(empty)")
 
 if p is None:
     st.info("Waiting for the first MQTT message…")
