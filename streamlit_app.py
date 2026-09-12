@@ -130,6 +130,6 @@ else:
 
 st.caption(
     "Live view + breaker control both go over MQTT, so this works from anywhere — not just "
-    "on the same Wi-Fi. Trend & energy history is on the meter's SD card — see the "
-    "**Trends** page (or the device's own page at `http://<gateway-ip>/`)."
+    "on the same Wi-Fi. Trend charts, energy history, and CSV download live on the device's "
+    "own page (`http://<esp32-ip>/`, same Wi-Fi) and window 4 of the LCD."
 )
