@@ -5,7 +5,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 from lib.config import LIVE_REFRESH_MS
-from lib.mqtt_live import live
+from lib.mqtt_live import live, publish_cmd
 from lib.timeutil import epoch_to_tz, fmt_age, now_tz
 
 st.set_page_config(page_title="Power Meter — Live", page_icon="⚡", layout="wide")
@@ -29,9 +29,13 @@ snap = live()
 p = snap["payload"]
 
 nphases = int(g(p, "phases", default=3)) if p else 3
+sw = int(g(p, "sw", default=-1)) if p else -1
+BREAKER = {1: ("🟢 ON", "green"), 0: ("🔴 OFF", "red"), 2: ("🟡 OPENING", "orange")}.get(sw, ("⚪ UNKNOWN", "gray"))
 
 left, right = st.columns([0.7, 0.3])
-left.title("⚡ Power Meter" + ("" if nphases == 3 else "  ·  1-phase"))
+with left:
+    st.title("⚡ Power Meter" + ("" if nphases == 3 else "  ·  1-phase"))
+    st.markdown(f"**BREAKER:** :{BREAKER[1]}[{BREAKER[0]}]")
 with right:
     st.caption(f"🕒 {now_tz():%Y-%m-%d %H:%M:%S} WIB")
     if snap["connected"]:
@@ -48,6 +52,34 @@ if p is None:
 
 if snap["age_s"] and snap["age_s"] > 15:
     st.warning(f"Data is stale — last update {fmt_age(snap['age_s'])}.")
+
+# ── Breaker control (MQTT command topic, confirm-before-send) ──────────────
+if "confirm_cmd" not in st.session_state:
+    st.session_state.confirm_cmd = None
+
+if st.session_state.confirm_cmd is None:
+    bcol1, bcol2, _ = st.columns([1, 1, 3])
+    if bcol1.button("🔴 Turn breaker OFF", use_container_width=True):
+        st.session_state.confirm_cmd = "OFF"
+        st.rerun()
+    if bcol2.button("🟢 Turn breaker ON", use_container_width=True):
+        st.session_state.confirm_cmd = "ON"
+        st.rerun()
+else:
+    cmd = st.session_state.confirm_cmd
+    st.warning(f"Confirm: send **{cmd}** to the breaker?")
+    ycol, ncol, _ = st.columns([1, 1, 3])
+    if ycol.button(f"Yes, turn {cmd}", type="primary", use_container_width=True):
+        ok = publish_cmd(cmd)
+        st.session_state.confirm_cmd = None
+        if ok:
+            st.success("Command sent — status above updates within ~2 s.")
+        else:
+            st.error("Could not send — MQTT isn't connected right now.")
+        st.rerun()
+    if ncol.button("Cancel", use_container_width=True):
+        st.session_state.confirm_cmd = None
+        st.rerun()
 
 if nphases == 1:
     # ── Single-phase ──────────────────────────────────────────────────────
@@ -89,6 +121,7 @@ else:
     c[5].metric("Avg V L-N", f"{avg_vln:.1f} V")
 
 st.caption(
-    "Live view is MQTT. Trend history is logged to the meter's SD card and "
-    "served by the device — see the **Trends** page in the sidebar."
+    "Live view + breaker control both go over MQTT, so this works from anywhere — not just "
+    "on the same Wi-Fi. Trend & energy history is on the meter's SD card — see the "
+    "**Trends** page (or the device's own page at `http://<esp32-ip>/`)."
 )
