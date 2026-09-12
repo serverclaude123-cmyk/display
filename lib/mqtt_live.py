@@ -27,6 +27,15 @@ _state = {
     "connect_attempts": 0, "last_attempt_epoch": 0.0, "probe_error": "not run yet",
 }
 _lock = threading.Lock()
+_log: list[str] = []
+
+
+def get_log() -> list[str]:
+    """paho's own internal log lines (last 40) — shows whether the CONNECT
+    packet was even sent and whether anything came back, when the higher
+    -level callbacks (on_connect/on_connect_fail) never fire at all."""
+    with _lock:
+        return list(_log)
 
 
 def _probe(host: str, port: int, tls: bool, timeout: float = 8.0) -> str | None:
@@ -106,10 +115,16 @@ def _build_client() -> mqtt.Client:
             with _lock:
                 _state["error"] = f"bad payload: {exc}"
 
+    def on_log(_c, _u, _level, buf):
+        with _lock:
+            _log.append(f"{time.strftime('%H:%M:%S')}  {buf}")
+            del _log[:-40]
+
     client.on_connect = on_connect
     client.on_connect_fail = on_connect_fail
     client.on_disconnect = on_disconnect
     client.on_message = on_message
+    client.on_log = on_log
     client.reconnect_delay_set(min_delay=1, max_delay=30)
 
     with _lock:
